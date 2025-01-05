@@ -1,0 +1,20 @@
+{
+  "name": "mercado-fechado-api",
+  "version": "1.0.0",
+  "description": "API integrada com MongoDB para listar, criar, editar e deletar produtos falsos",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "start": "node --watch index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Hest",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "fastify": "^5.2.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongodb": "^6.12.0"
+  }
+}
