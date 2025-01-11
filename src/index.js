@@ -1,6 +1,9 @@
 require("dotenv/config")
 const express = require("express")
 const jwt = require("jsonwebtoken")
+const z = require("zod")
+const { ObjectId } = require("mongodb")
+
 const db = require("./db")
 const mw = require("./middlewares")
 
@@ -16,19 +19,39 @@ app.get("/produtos", mw.authenticateToken, async (req, res) => {
   // PLT = Price Lower Than
   // PGT = Price Greater Than
   let { search, plt, pgt } = req.query // Filters
-  let query = {}
+  
+  function validateFilter(filter) {
+    let filterSchema = z.coerce.number()
+    let result = filterSchema.safeParse(filter)
+    
+    if (!result.success) return res.status(400).json({ message: "Insira filtros válidos" })
+    
+    return result.data
+  }
+  
+  let and = []
   
   if (search) {
-    query.$text = { $search: search }
+    and.push({
+      $text: { $search: search }
+    })
   }
   
   if (plt) {
-    query.price = { $lte: Number(plt) } // Products where PRICE <= PLT
+    let data = validateFilter(plt)
+    and.push({
+      price: { $lte: data } // Products where PRICE <= PLT
+    })
   }
   
   if (pgt) {
-    query.price = { $gte: Number(pgt) } // Products where PRICE >= PGT
+    let data = validateFilter(pgt)
+    and.push({
+      price: { $gte: data } // Products where PRICE >= PGT
+    })
   }
+  
+  let query = and ? { $and: and } : {}
   
   let products = await db.getProducts(query)
   
@@ -36,8 +59,17 @@ app.get("/produtos", mw.authenticateToken, async (req, res) => {
 })
 
 app.post("/produto", mw.authenticateToken, async (req, res) => {
+  let productSchema = z.object({
+    name: z.string(),
+    description: z.string(),
+    price: z.number()
+  })
+  let result = productSchema.safeParse(req.body)
+  
+  if (!result.success) return res.status(400).json({ message: "Produto inválido" })
+  
   await db.addProduct({
-    ...req.body,
+    ...result.data,
     seller: req.user.name
   })
   
@@ -46,17 +78,26 @@ app.post("/produto", mw.authenticateToken, async (req, res) => {
 
 app.put("/produto/:id", mw.authenticateToken, mw.authenticateSeller, async (req, res) => {
   let query = {
-    _id: req.params.id
+    _id: ObjectId(req.params.id)
   }
   
-  await db.updateProduct(query, req.body)
+  let productSchema = z.object({
+    name: z.string(),
+    description: z.string(),
+    price: z.number()
+  }).partial()
+  let result = productSchema.safeParse(req.body)
+  
+  if (!result.success) return res.status(400).json({ message: "Atualizações inválidas" })
+  
+  await db.updateProduct(query, result.data)
   
   return res.status(201).send()
 })
 
 app.delete("/produto/:id", mw.authenticateToken, mw.authenticateSeller, async (req, res) => {
   let query = {
-    _id: req.params.id
+    _id: ObjectId(req.params.id)
   }
   
   await db.deleteProduct(query)
